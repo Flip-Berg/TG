@@ -1,3 +1,4 @@
+from __future__ import annotations
 from collections import defaultdict 
 from typing import List 
 import networkx as nx
@@ -60,6 +61,8 @@ class Multigrafo:
         if vertice1 and vertice2:
             novoElo = Elo(nomeElo, vertice1, vertice2, isOrientado, peso)
             self.elos.append(novoElo)
+            vertice1.elos.append(novoElo)
+            vertice2.elos.append(novoElo)
 
     def removerVertice(self, nomeVertice):
         vertice = self.buscarVertice(nomeVertice)
