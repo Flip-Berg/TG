@@ -10,14 +10,7 @@ from Multigrafo import Multigrafo
 
 
 class MultigrafoComExcentricidade(Multigrafo):
-    """
-    Excentricidade e(v) = max_w d(v, w), com d(v, w) geodésica.
-    BFS (quantidade de elos) ou Dijkstra (menor custo), respeitando
-    orientação no multigrafo misto. Inalcançável => distancia infinita.
-    """
-
     def _saidas(self, vertice):
-        """Pares (vizinho, elo) alcançáveis a partir de vertice."""
         saidas = []
         for elo in vertice.elos:
             vizinho = None
@@ -83,24 +76,17 @@ class MultigrafoComExcentricidade(Multigrafo):
         return vertices, elos
 
     def _nomes_ordenados(self):
-        return sorted(
-            (v.nome for v in self.vertices),
-            key=lambda n: int(n[1:]) if n[1:].isdigit() else n,
-        )
+        return sorted((v.nome for v in self.vertices), key=lambda n: (len(n), n))
 
     def distancias_minimas(self, nome_vertice, considerar_peso=False):
         origem = self.buscarVertice(nome_vertice)
         if origem is None:
-            raise ValueError(f"Vertice '{nome_vertice}' nao encontrado.")
+            raise ValueError(f"Vértice '{nome_vertice}' não encontrado no grafo.")
         if considerar_peso:
             return self._dijkstra(origem)
         return self._bfs(origem)
 
     def excentricidade(self, nome_vertice, considerar_peso=False):
-        """
-        Calcula d(v, w) para todo w e devolve e(v) = max d(v, w),
-        os vertices mais distantes e os caminhos correspondentes.
-        """
         dist, pred = self.distancias_minimas(nome_vertice, considerar_peso)
         nomes = self._nomes_ordenados()
 
@@ -143,92 +129,92 @@ class MultigrafoComExcentricidade(Multigrafo):
 
 def _fmt_dist(valor):
     if valor == inf:
-        return "inf"
+        return "∞"
     if float(valor).is_integer():
         return str(int(valor))
     return f"{valor:.2f}"
 
 
 def imprimir_vertice(resultado, g):
-    modo = "ponderado (Dijkstra)" if resultado["considerar_peso"] else "nao ponderado (BFS)"
+    modo = "ponderado (Dijkstra)" if resultado["considerar_peso"] else "não ponderado (BFS)"
     v = resultado["vertice"]
-    print("=" * 72)
-    print(f"Excentricidade de {v}  [{modo}]")
-    print("=" * 72)
+    print(f"Excentricidade de {v} [{modo}]")
     print(f"  e({v}) = max d({v}, w) = {_fmt_dist(resultado['e_v'])}")
-    print("  Vertices mais distantes: " + ", ".join(resultado["mais_distantes"]))
-
-    print("\n  Distancia geodesica a partir de", v)
-    print("  " + "-" * 40)
-    print(f"  {'w':<8} {'d(v, w)':>10}")
-    print("  " + "-" * 40)
+    print(f"  Vértices mais distantes: {', '.join(resultado['mais_distantes'])}")
+    print(f"  Distâncias geodésicas a partir de {v}:")
     for nome in g._nomes_ordenados():
-        print(f"  {nome:<8} {_fmt_dist(resultado['distancias'][nome]):>10}")
-    print("  " + "-" * 40)
+        print(f"    d({v}, {nome}) = {_fmt_dist(resultado['distancias'][nome])}")
 
     for w, caminho in resultado["caminhos"].items():
         if caminho:
             print(f"  Caminho {v} -> {w}: " + " -> ".join(caminho))
         else:
-            print(f"  Caminho {v} -> {w}: inexistente (inalcancavel)")
+            print(f"  Caminho {v} -> {w}: inexistente (inalcançável)")
 
 
 def imprimir_tabela_todos(g, todos, considerar_peso=False):
-    modo = "ponderado (Dijkstra)" if considerar_peso else "nao ponderado (BFS)"
+    modo = "ponderado (Dijkstra)" if considerar_peso else "não ponderado (BFS)"
     nomes = g._nomes_ordenados()
     valores = {n: todos[n]["e_v"] for n in nomes}
-    e_min = min(valores.values())
-    e_max = max(valores.values())
+
+    e_min = min(valores.values()) if valores else 0
+    e_max = max(valores.values()) if valores else 0
     centrais = [n for n, e in valores.items() if e == e_min]
     perifericos = [n for n, e in valores.items() if e == e_max]
 
-    print("\n" + "=" * 72)
-    print(f"Excentricidade de todos os vertices  [{modo}]")
-    print("=" * 72)
-    print(f"{'Vertice':<10} {'e(v)':>8} {'Mais distantes':<28} {'Papel'}")
-    print("-" * 72)
+    print(f"\nExcentricidade de todos os vértices [{modo}]")
+    print(f"  {'Vértice':<10} {'e(v)':>8} {'Mais distantes':<20} {'Papel'}")
     for n in nomes:
         papeis = []
         if n in centrais:
             papeis.append("CENTRAL")
         if n in perifericos:
-            papeis.append("PERIFERICO")
+            papeis.append("PERIFÉRICO")
         distantes = ", ".join(todos[n]["mais_distantes"])
-        print(f"{n:<10} {_fmt_dist(valores[n]):>8} {distantes:<28} {', '.join(papeis)}")
-    print("-" * 72)
-    print(f"Raio  r(G) = min e(v) = {_fmt_dist(e_min)}  |  vertices centrais: {', '.join(centrais)}")
-    print(f"Diametro D(G) = max e(v) = {_fmt_dist(e_max)}  |  vertices perifericos: {', '.join(perifericos)}")
+        print(f"  {n:<10} {_fmt_dist(valores[n]):>8} {distantes:<20} {', '.join(papeis)}")
+
+    print(f"Raio  r(G) = min e(v) = {_fmt_dist(e_min)}  |  vértices centrais: {', '.join(centrais)}")
+    print(f"Diâmetro D(G) = max e(v) = {_fmt_dist(e_max)}  |  vértices periféricos: {', '.join(perifericos)}")
     return centrais, perifericos
 
 
 def mostrar_excentricidade(g, resultado):
     v = resultado["vertice"]
-    alvo = resultado["mais_distantes"][0]
+    alvo = resultado["mais_distantes"][0] if resultado["mais_distantes"] else v
     caminho_verts = set(resultado["caminhos"].get(alvo, []))
     caminho_elos = {id(elo) for elo in resultado["elos_caminho"].get(alvo, [])}
 
     Gnx = nx.MultiDiGraph()
     for vert in g.vertices:
         Gnx.add_node(vert.nome)
-    pos = nx.spring_layout(Gnx, seed=12, k=1.3)
 
-    plt.figure(figsize=(13, 10))
-    plt.title(
-        f"Excentricidade de {v}: e({v}) = {_fmt_dist(resultado['e_v'])}  "
-        f"(caminho ate {alvo})"
-    )
+    n = len(Gnx.nodes)
+    if n <= 15:
+        pos = nx.spring_layout(Gnx, seed=12, k=2.0)
+    else:
+        pos = nx.spring_layout(Gnx, seed=12, k=3.0)
+
+    largura = max(10, min(18, n * 0.9))
+    altura = max(8, min(14, n * 0.75))
+    plt.figure(figsize=(largura, altura))
+    plt.title(f"Resultado da Excentricidade - Q12: e({v}) = {_fmt_dist(resultado['e_v'])}")
+
+    tam_no = max(500, min(1500, 15000 // max(1, n)))
+    fonte = max(7, min(12, 140 // max(1, n)))
 
     outros = [n for n in Gnx.nodes if n not in caminho_verts]
     if outros:
-        nx.draw_networkx_nodes(Gnx, pos, nodelist=outros, node_size=900, node_color="lightgray")
+        nx.draw_networkx_nodes(Gnx, pos, nodelist=outros, node_size=tam_no, node_color="lightgray")
     intermediarios = [n for n in caminho_verts if n != v and n != alvo]
     if intermediarios:
         nx.draw_networkx_nodes(
-            Gnx, pos, nodelist=intermediarios, node_size=1100, node_color="palegreen"
+            Gnx, pos, nodelist=intermediarios, node_size=tam_no + 200, node_color="palegreen"
         )
-    nx.draw_networkx_nodes(Gnx, pos, nodelist=[v], node_size=1500, node_color="gold", node_shape="s")
-    nx.draw_networkx_nodes(Gnx, pos, nodelist=[alvo], node_size=1500, node_color="salmon")
-    nx.draw_networkx_labels(Gnx, pos, font_size=9, font_weight="bold")
+    if v in Gnx.nodes:
+        nx.draw_networkx_nodes(Gnx, pos, nodelist=[v], node_size=tam_no + 600, node_color="gold", node_shape="s")
+    if alvo in Gnx.nodes:
+        nx.draw_networkx_nodes(Gnx, pos, nodelist=[alvo], node_size=tam_no + 600, node_color="salmon")
+    nx.draw_networkx_labels(Gnx, pos, font_size=fonte, font_weight="bold")
 
     conexoes_pares = defaultdict(list)
     for elo in g.elos:
@@ -240,10 +226,10 @@ def mostrar_excentricidade(g, resultado):
         textos = []
         for idx, elo in enumerate(lista):
             origem, destino = elo.vertice1.nome, elo.vertice2.nome
-            textos.append(f"{elo.nome} (p={elo.peso})")
+            textos.append(f"{elo.nome}")
             no_caminho = id(elo) in caminho_elos
             cor = "forestgreen" if no_caminho else "lightgray"
-            largura = 3.0 if no_caminho else 1.0
+            largura_linha = 3.0 if no_caminho else 1.0
             if len(lista) == 1:
                 rad = 0.1 if elo.isOrientado else 0.0
             else:
@@ -254,33 +240,35 @@ def mostrar_excentricidade(g, resultado):
                 nx.draw_networkx_edges(
                     Gnx, pos, edgelist=[(origem, destino)],
                     arrows=True, arrowstyle="->", arrowsize=14,
-                    edge_color=cor, width=largura, connectionstyle=estilo,
+                    edge_color=cor, width=largura_linha, connectionstyle=estilo,
                 )
             else:
                 nx.draw_networkx_edges(
                     Gnx, pos, edgelist=[(origem, destino)],
-                    arrowstyle="-", edge_color=cor, width=largura,
+                    arrowstyle="-", edge_color=cor, width=largura_linha,
                     connectionstyle=estilo,
                 )
         rotulos[(par[0], par[1])] = "\n".join(textos)
 
-    nx.draw_networkx_edge_labels(Gnx, pos, edge_labels=rotulos, font_size=7)
+    if n <= 25:
+        nx.draw_networkx_edge_labels(Gnx, pos, edge_labels=rotulos, font_size=max(5, fonte - 2))
+
     plt.legend(
         handles=[
-            Patch(facecolor="gold", label=f"v selecionado ({v})"),
+            Patch(facecolor="gold", label=f"vértice selecionado ({v})"),
             Patch(facecolor="salmon", label=f"mais distante ({alvo})"),
-            Patch(facecolor="palegreen", label="vertices do caminho geodesico"),
+            Patch(facecolor="palegreen", label="vértices do caminho geodésico"),
             Patch(facecolor="forestgreen", label="elos do caminho"),
         ],
         loc="upper right",
+        fontsize=max(6, fonte - 1),
     )
     plt.axis("off")
     plt.tight_layout()
     plt.show()
 
 
-def montar_grafo_teste():
-    """Multigrafo misto ponderado com 12 vertices."""
+def montar_grafo_demonstracao():
     g = MultigrafoComExcentricidade([], [])
     for i in range(1, 13):
         g.adicionarVertice(f"V{i}")
@@ -303,20 +291,51 @@ def montar_grafo_teste():
     return g
 
 
-if __name__ == "__main__":
-    g = montar_grafo_teste()
-    vertice_escolhido = "V1"
+def executar_questao_12(grafo: Multigrafo, nome_vertice=None, considerar_peso=False, mostrar_grafico=True):
+    if not isinstance(grafo, MultigrafoComExcentricidade):
+        g = MultigrafoComExcentricidade([], [])
+        for v in grafo.vertices:
+            g.adicionarVertice(v.nome)
+        for elo in grafo.elos:
+            g.adicionarElo(
+                elo.nome,
+                elo.vertice1.nome,
+                elo.vertice2.nome,
+                elo.isOrientado,
+                elo.peso,
+            )
+    else:
+        g = grafo
 
-    res_bfs = g.excentricidade(vertice_escolhido, considerar_peso=False)
+    print(f"Questão 12 - Excentricidade, raio e diâmetro")
+    print(f"Analisando o grafo fornecido ({len(g.vertices)} vértices, {len(g.elos)} elos)...")
+
+    if nome_vertice is None:
+        if g.vertices:
+            nome_vertice = g.vertices[0].nome
+        else:
+            print("Grafo vazio: sem vértices para analisar.")
+            return None
+
+    res_bfs = g.excentricidade(nome_vertice, considerar_peso=False)
     imprimir_vertice(res_bfs, g)
 
-    res_dij = g.excentricidade(vertice_escolhido, considerar_peso=True)
-    print(f"\n  Comparacao ponderada: e({vertice_escolhido}) = {_fmt_dist(res_dij['e_v'])} "
-          f"| mais distantes: {', '.join(res_dij['mais_distantes'])}")
-    for w, caminho in res_dij["caminhos"].items():
-        if caminho:
-            print(f"  Caminho ponderado {vertice_escolhido} -> {w}: " + " -> ".join(caminho))
+    if considerar_peso:
+        res_dij = g.excentricidade(nome_vertice, considerar_peso=True)
+        modo = "ponderado"
+        print(f"\nComparativo {modo}: e({nome_vertice}) = {_fmt_dist(res_dij['e_v'])} "
+              f"| mais distantes: {', '.join(res_dij['mais_distantes'])}")
+        for w, caminho in res_dij["caminhos"].items():
+            if caminho:
+                print(f"  Caminho {modo} {nome_vertice} -> {w}: " + " -> ".join(caminho))
 
     todos = g.excentricidade_todos(considerar_peso=False)
     imprimir_tabela_todos(g, todos, considerar_peso=False)
-    mostrar_excentricidade(g, res_bfs)
+    if mostrar_grafico:
+        mostrar_excentricidade(g, res_bfs)
+    return g
+
+
+if __name__ == "__main__":
+    grafo_demonstracao = montar_grafo_demonstracao()
+    executar_questao_12(grafo_demonstracao)

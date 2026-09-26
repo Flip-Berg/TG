@@ -1,12 +1,13 @@
 import importlib.util
 import os
 from collections import defaultdict
+from typing import List
 
 import matplotlib.pyplot as plt
 import networkx as nx
 from matplotlib.patches import Patch
 
-from Multigrafo import Multigrafo
+from Multigrafo import Elo, Multigrafo, Vertice
 
 
 def _carregar_modulo_q6():
@@ -18,27 +19,17 @@ def _carregar_modulo_q6():
 
 
 class SubgrafoMaximalArvore:
-    """
-    Produz um subgrafo maximal árvore (ou floresta maximal) de G.
-
-    Sobre o grafo subjacente (orientação ignorada para conectividade):
-    uma DFS/Traverse inclui um elo na árvore somente quando ele liga um
-    vértice já visitado a um ainda não visitado. Elos restantes fecham ciclo
-    e são descartados. Cada nova raiz da Traverse inicia uma componente.
-    """
-
     def __init__(self, G: Multigrafo):
         self.G = G
-        self.elos_arvore = []
+        self.elos_arvore: List[Elo] = []
         self.componentes = 0
-        self.T = None
-        self.raizes = []
-        self.pais = {}
-        self.filhos = defaultdict(list)
-        self.niveis = {}
+        self.T: Multigrafo | None = None
+        self.raizes: List[str] = []
+        self.pais: dict = {}
+        self.filhos: dict = defaultdict(list)
+        self.niveis: dict = {}
 
     def _adjacencias_subjacentes(self, vertice):
-        """Vizinhos no grafo subjacente: todo elo incidente é bidirecional."""
         adjacencias = []
         elos_vistos = set()
 
@@ -62,11 +53,6 @@ class SubgrafoMaximalArvore:
         return adjacencias
 
     def _traverse(self, v, visitados, nivel=0, pai=None):
-        """
-        Traverse(G, v) para árvore geradora:
-        marca v, registra o nível DFS e, para cada adj não visitado,
-        inclui o elo (filho) e recursa.
-        """
         visitados.add(v.nome)
         self.niveis[v.nome] = nivel
 
@@ -116,53 +102,46 @@ class SubgrafoMaximalArvore:
         c = self.componentes
         valido = n_e == n_v - c
 
-        print("=" * 64)
-        print("Subgrafo maximal árvore / floresta maximal de G")
-        print("=" * 64)
+        print(f"Analisando o grafo fornecido ({n_v} vértices e {len(self.G.elos)} elos)...")
+        print("Construindo subgrafo maximal árvore (floresta maximal) por DFS...")
 
-        print("\nVértices do subgrafo (|V| = {}):".format(n_v))
-        print("  " + ", ".join(v.nome for v in self.G.vertices))
+        if self.raizes:
+            print("Componentes encontradas:", self.componentes)
+            print("Raízes de cada árvore:", ", ".join(self.raizes))
 
         print("\nElos selecionados para a árvore/floresta (|E_T| = {}):".format(n_e))
-        print("-" * 64)
-        print(f"{'Elo':<8} {'v1':<8} {'v2':<8} {'Orientado':<12} {'Peso':>8}")
-        print("-" * 64)
-        for elo in self.elos_arvore:
-            orient = "sim" if elo.isOrientado else "não"
-            print(
-                f"{elo.nome:<8} {elo.vertice1.nome:<8} {elo.vertice2.nome:<8} "
-                f"{orient:<12} {elo.peso:>8}"
-            )
-        print("-" * 64)
+        if n_e == 0:
+            print("  (nenhum elo - grafo com vértices isolados)")
+        else:
+            print("  " + ", ".join(e.nome for e in self.elos_arvore))
 
         nomes_arvore = {elo.nome for elo in self.elos_arvore}
         elos_descartados = [elo for elo in self.G.elos if elo.nome not in nomes_arvore]
-        print("\nElos descartados (formariam ciclo no grafo subjacente):")
         if elos_descartados:
+            print("\nElos descartados (formariam ciclo no grafo subjacente):")
             print("  " + ", ".join(elo.nome for elo in elos_descartados))
-        else:
-            print("  (nenhum)")
 
         print("\nValidação da propriedade de árvore/floresta:")
         print(f"  |V| = {n_v}")
         print(f"  |E_T| = {n_e}")
-        print(f"  C (componentes conexas no grafo subjacente) = {c}")
-        print(f"  |E_T| = |V| - C  =>  {n_e} = {n_v} - {c}  =>  {n_v - c}")
+        print(f"  Componentes conexas (C) = {c}")
+        print(f"  Verificação |E_T| = |V| - C: {n_e} = {n_v} - {c} = {n_v - c}")
         if c == 1:
-            print("  G subjacente é conexo: |E_T| = |V| - 1 (árvore geradora).")
+            print("  Grafo subjacente é conexo: temos uma árvore geradora única.")
         else:
-            print("  G subjacente é desconexo: floresta maximal com C árvores.")
+            print("  Grafo subjacente é desconexo: floresta maximal com C árvores.")
         print(f"  Resultado da validação: {'OK' if valido else 'FALHOU'}")
 
-        print("\nHierarquia da DFS (raiz no topo):")
-        for nome in [v.nome for v in self.G.vertices]:
-            nivel = self.niveis.get(nome, "-")
-            pai = self.pais.get(nome, "(raiz)")
-            filhos = ", ".join(self.filhos.get(nome, [])) or "(folha)"
-            print(f"  {nome}: nível {nivel}, pai={pai}, filhos={filhos}")
+        if self.niveis:
+            print("\nHierarquia da DFS (níveis / pais / filhos):")
+            for v in self.G.vertices:
+                nome = v.nome
+                nivel = self.niveis.get(nome, "-")
+                pai = self.pais.get(nome, "(raiz)")
+                filhos = ", ".join(self.filhos.get(nome, [])) or "(folha)"
+                print(f"  {nome}: nível {nivel}, pai={pai}, filhos={filhos}")
 
     def _posicionar_subarvore(self, nome, x_esq, pos, dx=1.8, dy=1.6):
-        """Coloca o nó no centro horizontal dos filhos; y = -nível DFS."""
         filhos = self.filhos.get(nome, [])
         y = -self.niveis[nome] * dy
 
@@ -179,10 +158,6 @@ class SubgrafoMaximalArvore:
         return x_cursor
 
     def _layout_hierarquico(self):
-        """
-        Disposição por níveis da Traverse: cada raiz no topo da sua árvore;
-        florestas ficam lado a lado.
-        """
         pos = {}
         x_cursor = 0.0
         for raiz in self.raizes:
@@ -191,7 +166,6 @@ class SubgrafoMaximalArvore:
         return pos
 
     def mostrarGrafo(self):
-        """Desenha a árvore/floresta maximal em layout hierárquico (DFS)."""
         Gnx = nx.DiGraph()
         for v in self.G.vertices:
             Gnx.add_node(v.nome)
@@ -208,45 +182,56 @@ class SubgrafoMaximalArvore:
             Gnx.add_edge(pai, filho)
             rotulos_arestas[(pai, filho)] = elo.nome
 
-        pos = self._layout_hierarquico()
+        n = len(self.G.vertices)
+        if n <= 20:
+            pos = self._layout_hierarquico()
+        else:
+            pos = nx.spring_layout(Gnx, seed=42, k=2.0)
 
         raizes = set(self.raizes)
         folhas = {nome for nome in self.niveis if not self.filhos.get(nome)}
         internos = [n for n in self.niveis if n not in raizes and n not in folhas]
 
-        plt.figure(figsize=(14, 11))
-        plt.title(
-            "Árvore maximal em layout hierárquico "
-            "(raiz no topo; camadas = níveis da DFS)"
-        )
+        largura = max(10, min(20, n * 0.9))
+        altura = max(8, min(14, n * 0.75))
 
-        nx.draw_networkx_nodes(
-            Gnx, pos, nodelist=list(raizes), node_size=2200,
-            node_color="gold", node_shape="s",
-        )
-        nx.draw_networkx_nodes(
-            Gnx, pos, nodelist=internos, node_size=1800,
-            node_color="skyblue",
-        )
-        nx.draw_networkx_nodes(
-            Gnx, pos, nodelist=list(folhas - raizes), node_size=1800,
-            node_color="palegreen",
-        )
+        plt.figure(figsize=(largura, altura))
+        plt.title("Resultado da Árvore Maximal - Q8")
+
+        tam_no = max(400, min(2200, 20000 // max(1, n)))
+        tam_fonte = max(6, min(11, 150 // max(1, n)))
+
+        if raizes:
+            nx.draw_networkx_nodes(
+                Gnx, pos, nodelist=list(raizes), node_size=tam_no,
+                node_color="gold", node_shape="s",
+            )
+        if internos:
+            nx.draw_networkx_nodes(
+                Gnx, pos, nodelist=internos, node_size=tam_no,
+                node_color="skyblue",
+            )
+        folhas_nao_raizes = list(folhas - raizes)
+        if folhas_nao_raizes:
+            nx.draw_networkx_nodes(
+                Gnx, pos, nodelist=folhas_nao_raizes, node_size=tam_no,
+                node_color="palegreen",
+            )
 
         rotulos_nos = {
             nome: f"{nome}\n(n={self.niveis[nome]})"
             for nome in self.niveis
         }
-        nx.draw_networkx_labels(Gnx, pos, labels=rotulos_nos, font_size=8, font_weight="bold")
+        nx.draw_networkx_labels(Gnx, pos, labels=rotulos_nos, font_size=tam_fonte, font_weight="bold")
 
         nx.draw_networkx_edges(
             Gnx,
             pos,
             arrows=True,
             arrowstyle="-|>",
-            arrowsize=18,
+            arrowsize=16,
             edge_color="forestgreen",
-            width=2.4,
+            width=2.0,
             connectionstyle="arc3,rad=0.0",
         )
         nx.draw_networkx_edge_labels(
@@ -254,7 +239,7 @@ class SubgrafoMaximalArvore:
             pos,
             edge_labels=rotulos_arestas,
             font_color="black",
-            font_size=8,
+            font_size=max(5, tam_fonte - 1),
         )
 
         plt.legend(
@@ -264,6 +249,7 @@ class SubgrafoMaximalArvore:
                 Patch(facecolor="palegreen", label="Folha"),
             ],
             loc="upper right",
+            fontsize=tam_fonte,
         )
 
         plt.axis("off")
@@ -271,11 +257,31 @@ class SubgrafoMaximalArvore:
         plt.show()
 
 
-if __name__ == "__main__":
-    q6 = _carregar_modulo_q6()
-    g = q6.montar_multigrafo_teste()
+def montar_multigrafo_demonstracao() -> Multigrafo:
+    try:
+        q6 = _carregar_modulo_q6()
+        return q6.montar_multigrafo_demonstracao()
+    except Exception:
+        g = Multigrafo([], [])
+        for i in range(1, 11):
+            g.adicionarVertice(f"V{i}")
+        arestas = [("V1","V2"),("V2","V3"),("V3","V4"),("V4","V5"),("V1","V5"),
+                   ("V5","V6"),("V6","V7"),("V7","V8"),("V8","V9"),("V9","V10"),("V7","V10")]
+        for idx, (a, b) in enumerate(arestas, 1):
+            g.adicionarElo(f"e{idx}", a, b, isOrientado=(idx % 4 == 0), peso=1)
+        return g
 
-    solucao = SubgrafoMaximalArvore(g)
+
+def executar_questao_8(grafo: Multigrafo, mostrar_grafico=True):
+    print("Questão 8 - Subgrafo maximal árvore / floresta maximal")
+    solucao = SubgrafoMaximalArvore(grafo)
     solucao.construir()
     solucao.imprimir_resultado()
-    solucao.mostrarGrafo()
+    if mostrar_grafico:
+        solucao.mostrarGrafo()
+    return solucao
+
+
+if __name__ == "__main__":
+    grafo_demonstracao = montar_multigrafo_demonstracao()
+    executar_questao_8(grafo_demonstracao)
