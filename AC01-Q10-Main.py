@@ -8,11 +8,6 @@ from Multigrafo import Multigrafo
 
 
 def chave_ligacao(elo):
-    """
-    Identidade de uma ligação para comparação de conjuntos E(G):
-    par de vértices (u, v) + orientação.
-    Elo orientado: (u -> v). Elo não orientado: {u, v} (ordem canônica).
-    """
     n1, n2 = elo.vertice1.nome, elo.vertice2.nome
     if elo.isOrientado:
         return ("dir", n1, n2)
@@ -24,11 +19,6 @@ def conjunto_elos(grafo):
 
 
 def adjacentes(grafo, nome_vertice):
-    """
-    Adj(u) no multigrafo misto:
-    - elo orientado: somente vertice1 alcança vertice2;
-    - elo não orientado: alcance bidirecional.
-    """
     vertice = grafo.buscarVertice(nome_vertice)
     if vertice is None:
         return set()
@@ -84,14 +74,11 @@ def similaridade_global(g1, g2):
 
 
 def similaridade_local_vertices(g1, g2):
-    """
-    Vértices homólogos: mesmo nome em G1 e G2.
-    Métricas sobre Adj(u) em cada grafo; devolve tabela por vértice e médias.
-    """
-    nomes = sorted(
-        {v.nome for v in g1.vertices} & {v.nome for v in g2.vertices},
-        key=lambda n: (len(n), n),
-    )
+    nomes_g1 = {v.nome for v in g1.vertices}
+    nomes_g2 = {v.nome for v in g2.vertices}
+    nomes = sorted(nomes_g1 & nomes_g2, key=lambda n: (len(n), n))
+    so_g1 = sorted(nomes_g1 - nomes_g2, key=lambda n: (len(n), n))
+    so_g2 = sorted(nomes_g2 - nomes_g1, key=lambda n: (len(n), n))
 
     linhas = []
     for nome in nomes:
@@ -105,52 +92,49 @@ def similaridade_local_vertices(g1, g2):
         "cosseno": sum(l["cosseno"] for l in linhas) / n,
         "overlap": sum(l["overlap"] for l in linhas) / n,
     }
-    return linhas, medias
+    return linhas, medias, so_g1, so_g2
 
 
 def _pct(valor):
     return f"{valor * 100:6.2f}%"
 
 
-def imprimir_resultados(g1, g2, global_, locais, medias):
-    print("=" * 72)
-    print("Similaridade de grafos: Jaccard, Cosseno e Coeficiente de Sobreposição")
-    print("=" * 72)
+def imprimir_resultados(g1, g2, global_, locais, medias, so_g1, so_g2):
+    print("Questão 10 - Similaridade de grafos: Jaccard, Cosseno e Overlap")
+    print(f"Analisando G1 ({len(g1.vertices)} vértices, {len(g1.elos)} elos) e "
+          f"G2 ({len(g2.vertices)} vértices, {len(g2.elos)} elos)...")
 
-    print("\nEstrutura global")
-    print("-" * 72)
-    print(f"  |V(G1)| = {len(g1.vertices):>3}     |E(G1)| = {global_['tam_a']:>3}")
-    print(f"  |V(G2)| = {len(g2.vertices):>3}     |E(G2)| = {global_['tam_b']:>3}")
+    if so_g1:
+        print(f"Vértices presentes só em G1: {', '.join(so_g1)}")
+    if so_g2:
+        print(f"Vértices presentes só em G2: {', '.join(so_g2)}")
+
+    print("\nEstrutura global (comparação dos conjuntos de ligações):")
     print(f"  |E(G1) AND E(G2)| = {global_['inter']}")
     print(f"  |E(G1) OR  E(G2)| = {global_['uniao']}")
+    print(f"  Jaccard  = {global_['jaccard']:.4f} ({_pct(global_['jaccard'])})")
+    print(f"  Cosseno  = {global_['cosseno']:.4f} ({_pct(global_['cosseno'])})")
+    print(f"  Overlap  = {global_['overlap']:.4f} ({_pct(global_['overlap'])})")
 
-    print("\nMétricas globais (conjuntos de ligações)")
-    print("-" * 72)
-    print(f"{'Métrica':<28} {'Índice':>10} {'Percentual':>12}")
-    print("-" * 72)
-    print(f"{'Jaccard':<28} {global_['jaccard']:>10.4f} {_pct(global_['jaccard']):>12}")
-    print(f"{'Cosseno':<28} {global_['cosseno']:>10.4f} {_pct(global_['cosseno']):>12}")
-    print(f"{'Sobreposição (Overlap)':<28} {global_['overlap']:>10.4f} {_pct(global_['overlap']):>12}")
-    print("-" * 72)
-
-    print("\nSimilaridade local por vértice homólogo (Adj(u) em G1 vs Adj(u) em G2)")
-    print("-" * 72)
-    print(f"{'Vertice':<10} {'|Adj1|':>7} {'|Adj2|':>7} {'|inter|':>7} "
-          f"{'Jaccard':>10} {'Cosseno':>10} {'Overlap':>10}")
-    print("-" * 72)
-    for linha in locais:
+    print("\nSimilaridade local por vértice homólogo (Adj em G1 vs Adj em G2):")
+    if not locais:
+        print("  (nenhum vértice com mesmo nome em ambos os grafos para comparar)")
+    else:
+        for linha in locais:
+            print(
+                f"  {linha['vertice']:<8} "
+                f"|Adj1|={linha['tam_a']:<3} |Adj2|={linha['tam_b']:<3} "
+                f"inter={linha['inter']:<3} "
+                f"J={_pct(linha['jaccard']).strip():>8} "
+                f"C={_pct(linha['cosseno']).strip():>8} "
+                f"O={_pct(linha['overlap']).strip():>8}"
+            )
         print(
-            f"{linha['vertice']:<10} {linha['tam_a']:>7} {linha['tam_b']:>7} "
-            f"{linha['inter']:>7} {_pct(linha['jaccard']):>10} "
-            f"{_pct(linha['cosseno']):>10} {_pct(linha['overlap']):>10}"
+            f"  {'Média':<8} "
+            f"J={_pct(medias['jaccard']).strip():>8} "
+            f"C={_pct(medias['cosseno']).strip():>8} "
+            f"O={_pct(medias['overlap']).strip():>8}"
         )
-    print("-" * 72)
-    print(
-        f"{'Media':<10} {'':>7} {'':>7} {'':>7} "
-        f"{_pct(medias['jaccard']):>10} {_pct(medias['cosseno']):>10} "
-        f"{_pct(medias['overlap']):>10}"
-    )
-    print("-" * 72)
 
 
 def desenhar_em_eixo(grafo, ax, titulo):
@@ -158,10 +142,18 @@ def desenhar_em_eixo(grafo, ax, titulo):
     for v in grafo.vertices:
         G.add_node(v.nome)
 
-    pos = nx.circular_layout(G)
+    n = len(G.nodes)
+    if n <= 15:
+        pos = nx.circular_layout(G)
+    else:
+        pos = nx.spring_layout(G, seed=42, k=2.0)
+
     ax.set_title(titulo)
-    nx.draw_networkx_nodes(G, pos, ax=ax, node_size=700, node_color="skyblue")
-    nx.draw_networkx_labels(G, pos, ax=ax, font_size=9, font_weight="bold")
+    tam_no = max(300, min(900, 9000 // max(1, n)))
+    fonte = max(6, min(10, 120 // max(1, n)))
+
+    nx.draw_networkx_nodes(G, pos, ax=ax, node_size=tam_no, node_color="skyblue")
+    nx.draw_networkx_labels(G, pos, ax=ax, font_size=fonte, font_weight="bold")
 
     conexoes_pares = defaultdict(list)
     for elo in grafo.elos:
@@ -187,7 +179,7 @@ def desenhar_em_eixo(grafo, ax, titulo):
             if elo.isOrientado:
                 nx.draw_networkx_edges(
                     G, pos, ax=ax, edgelist=[(origem, destino)],
-                    arrows=True, arrowstyle="->", arrowsize=14,
+                    arrows=True, arrowstyle="->", arrowsize=12,
                     edge_color="red", connectionstyle=estilo,
                 )
             else:
@@ -197,27 +189,30 @@ def desenhar_em_eixo(grafo, ax, titulo):
                 )
         rotulos_pares[(par[0], par[1])] = "\n".join(textos_rotulos)
 
-    nx.draw_networkx_edge_labels(
-        G, pos, ax=ax, edge_labels=rotulos_pares, font_size=7,
-    )
+    if n <= 20:
+        nx.draw_networkx_edge_labels(
+            G, pos, ax=ax, edge_labels=rotulos_pares,
+            font_size=max(5, fonte - 1),
+        )
     ax.axis("off")
+    return pos
 
 
 def mostrar_grafos_lado_a_lado(g1, g2):
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
-    fig.suptitle("Comparação visual de G1 e G2 (vermelho = orientado, azul = não orientado)")
-    desenhar_em_eixo(g1, ax1, f"G1  (|V|={len(g1.vertices)}, |E|={len(g1.elos)})")
-    desenhar_em_eixo(g2, ax2, f"G2  (|V|={len(g2.vertices)}, |E|={len(g2.elos)})")
+    n1 = len(g1.vertices)
+    n2 = len(g2.vertices)
+    largura = max(12, min(20, (n1 + n2) * 0.7))
+    altura = max(7, min(12, max(n1, n2) * 0.6))
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(largura, altura))
+    fig.suptitle("Resultado da Similaridade - Q10")
+    desenhar_em_eixo(g1, ax1, f"G1 (|V|={n1}, |E|={len(g1.elos)})")
+    desenhar_em_eixo(g2, ax2, f"G2 (|V|={n2}, |E|={len(g2.elos)})")
     plt.tight_layout()
     plt.show()
 
 
-def montar_grafos_similares_teste():
-    """
-    Dois multigrafos mistos com 10 vértices (V1..V10).
-    9 ligações idênticas (par + orientação) e 6 exclusivas em cada um:
-    Overlap = 9/15 = 60%.
-    """
+def montar_grafos_demonstracao():
     g1 = Multigrafo([], [])
     g2 = Multigrafo([], [])
     for i in range(1, 11):
@@ -264,9 +259,15 @@ def montar_grafos_similares_teste():
     return g1, g2
 
 
-if __name__ == "__main__":
-    g1, g2 = montar_grafos_similares_teste()
+def executar_questao_10(g1: Multigrafo, g2: Multigrafo, mostrar_grafico=True):
     global_ = similaridade_global(g1, g2)
-    locais, medias = similaridade_local_vertices(g1, g2)
-    imprimir_resultados(g1, g2, global_, locais, medias)
-    mostrar_grafos_lado_a_lado(g1, g2)
+    locais, medias, so_g1, so_g2 = similaridade_local_vertices(g1, g2)
+    imprimir_resultados(g1, g2, global_, locais, medias, so_g1, so_g2)
+    if mostrar_grafico:
+        mostrar_grafos_lado_a_lado(g1, g2)
+    return global_, locais, medias
+
+
+if __name__ == "__main__":
+    g1_demo, g2_demo = montar_grafos_demonstracao()
+    executar_questao_10(g1_demo, g2_demo)
